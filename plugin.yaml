@@ -4,7 +4,7 @@ version: "0.1.2"
 usage: scan filesystem and skip non-explicit dependencies
 description: |-
   A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
-  Usage: trivy exp-dep /path/to/project
+  Usage: trivy exp-dep PATH
 platforms:
   - selector:
       os: linux
