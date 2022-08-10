@@ -1,0 +1,13 @@
+name: "explicit-dependecy"
+repository: github.com/satandyh/trivy-plugin-explicit-dependency
+version: "0.1.0"
+usage: scan kubectl resources
+description: |-
+  A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
+  Usage: trivy exp-dep /path/to/project
+platforms:
+  - selector:
+      os: linux
+      arch: amd64
+    uri: ./trivy-explicit-dependency
+    bin: ./trivy-explicit-dependency
