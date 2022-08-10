@@ -1,4 +1,4 @@
-name: "explicit-dependency"
+name: "exp-dep"
 repository: github.com/satandyh/trivy-plugin-explicit-dependency
 version: "0.1.1"
 usage: scan filesystem and skip non-explicit dependencies
