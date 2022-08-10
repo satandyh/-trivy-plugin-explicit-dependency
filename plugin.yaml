@@ -1,6 +1,6 @@
 name: "exp-dep"
 repository: github.com/satandyh/trivy-plugin-explicit-dependency
-version: "0.1.2"
+version: "0.1.3"
 usage: Scan filesystem and skip non-explicit dependencies
 description: |-
   A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
