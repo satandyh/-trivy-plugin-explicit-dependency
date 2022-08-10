@@ -2,11 +2,13 @@
 
 # Usage
 function usage() {
-  cat << EOS >&2
+  cat <<EOS >&2
 Usage: trivy exp-dep [-h,--help] PATH [TRIVY OPTION]
  A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
+
 Options:
   -h, --help    Show usage.
+
 Examples:
   # Scan fs
   trivy exp-dep /path/to/project
@@ -28,24 +30,23 @@ fi
 KUBECTL_PARAM=()
 for opt in "$@"; do
   case "${opt}" in
-    '--' )
-      shift
-      TRIVY_PARAM=( "$@" )
-      break
-      ;;
-    * )
-      if [ -n "$1" ]; then
-        KUBECTL_PARAM+=("$1")
-      fi
-      shift
-      ;;
+  '--')
+    shift
+    TRIVY_PARAM=("$@")
+    break
+    ;;
+  *)
+    if [ -n "$1" ]; then
+      KUBECTL_PARAM+=("$1")
+    fi
+    shift
+    ;;
   esac
 done
-
 
 images=$(kubectl get "${KUBECTL_PARAM[@]}" -oyaml | sed -nE 's@[^\w]*image: ([a-zA-Z0-9/:])@\1@p' | uniq)
 while read -r image; do
   if [ -n "$image" ]; then
     scan "${TRIVY_PARAM[@]}" "$image"
   fi
-done <<< "$images"
+done <<<"$images"
