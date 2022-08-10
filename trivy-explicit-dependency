@@ -3,23 +3,21 @@
 # Usage
 function usage() {
   cat << EOS >&2
-Usage: trivy kubectl [-h,--help] TYPE NAME [TRIVY OPTION]
- A Trivy plugin that scans the images of a kubernetes resource.
+Usage: trivy exp-dep [-h,--help] PATH [TRIVY OPTION]
+ A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
 Options:
   -h, --help    Show usage.
 Examples:
-  # Scan a Pod
-  trivy kubectl pod mypod
-  # Scan a Deployment
-  trivy kubectl deployment mydeployment -n mynamespace
-  # Scan a Job and filter by severity
-  trivy kubectl job myjob -n mynamespace -- --severity CRITICAL
+  # Scan fs
+  trivy exp-dep /path/to/project
+  # Scan fs and filter by severity
+  trivy exp-dep /path/to/project -- --severity CRITICAL
 EOS
   exit
 }
 
 function scan {
-  trivy image $@
+  trivy conf --policy ./policy $@
 }
 
 if [[ ($# -eq 0) || ($1 == "--help") || ($1 == "-h") ]]; then
