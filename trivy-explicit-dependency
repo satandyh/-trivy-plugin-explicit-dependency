@@ -1,9 +1,15 @@
 #!/bin/bash
 
+# VARS
+PRESCAN_PKG=()
+PROJECT_PATH=()
+FILTER=()
+IGNORE_PKG=()
+
 # Usage
 function usage() {
   cat <<EOS >&2
-Usage: trivy exp-dep [-h,--help] PATH [TRIVY OPTION]
+Usage: trivy exp-dep [-h,--help] PROJECT_PATH [TRIVY OPTION]
  A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
 
 Options:
@@ -18,16 +24,62 @@ EOS
   exit
 }
 
+# pre scan without any policy
+function firstscan() {
+  trivy fs -q -f json -o $PROJECT_PATH/prescan.json $@
+}
+
+# find all packages in json file after prescan
+function findfiles() {
+  PRESCAN_PKG=$(grep '"PkgName":' $PROJECT_PATH/prescan.json | cut -d"\"" -f4 | sort | uniq)
+}
+
+function filterFindNPM() {
+  TEMP=()
+  # find all packages that present in prescan result and in package.json file
+  while read -r line; do
+    TEMP+=($(find $PROJECT_PATH -name package.json -exec grep -o "\"$line\":" {} \; | cut -d"\"" -f2))
+  done <<<$PRESCAN_PKG
+  FILTER=($(echo "${TEMP[@]}" | tr ' ' '\n' | sort | uniq | tr '\n' ' '))
+  unset TEMP
+  # find all packages that present only in prescan result - we will ignore them in policy
+  IGNORE_PKG=($(echo ${PRESCAN_PKG[@]} ${FILTER[@]} | tr ' ' '\n' | sort | uniq -u | tr '\n' ' '))
+}
+
+# create policy
+function create_policy() {
+  cat <<EOF >$PROJECT_PATH/ignore_policy.rego
+package trivy
+
+import data.lib.trivy
+
+default ignore = false
+
+EOF
+  v=$(printf "\"%s\"," ${IGNORE_PKG[@]})
+  echo "ignore_pkgs := {${v::-1}}" >>$PROJECT_PATH/ignore_policy.rego
+
+  cat <<EOF >>$PROJECT_PATH/ignore_policy.rego
+
+ignore {
+  input.PkgName == ignore_pkgs[_]
+}
+EOF
+}
+
+# main scan
 function scan {
-  trivy conf --policy ./policy $@
+  trivy fs --ignore-policy $PROJECT_PATH/ignore_policy.rego $@
+  rm $PROJECT_PATH/ignore_policy.rego
+  rm $PROJECT_PATH/prescan.json
 }
 
 if [[ ($# -eq 0) || ($1 == "--help") || ($1 == "-h") ]]; then
-  # No commands or the --help flag passed and we'll show the usage instructions
+  # No commands or the -h/--help flag passed and we'll show the usage instructions
   usage
 fi
 
-KUBECTL_PARAM=()
+PROJECT_PATH=()
 for opt in "$@"; do
   case "${opt}" in
   '--')
@@ -37,16 +89,15 @@ for opt in "$@"; do
     ;;
   *)
     if [ -n "$1" ]; then
-      KUBECTL_PARAM+=("$1")
+      PROJECT_PATH+=("$1")
     fi
     shift
     ;;
   esac
 done
 
-images=$(kubectl get "${KUBECTL_PARAM[@]}" -oyaml | sed -nE 's@[^\w]*image: ([a-zA-Z0-9/:])@\1@p' | uniq)
-while read -r image; do
-  if [ -n "$image" ]; then
-    scan "${TRIVY_PARAM[@]}" "$image"
-  fi
-done <<<"$images"
+firstscan ${TRIVY_PARAM[@]} $PROJECT_PATH
+findfiles
+filterFindNPM
+create_policy
+scan ${TRIVY_PARAM[@]} $PROJECT_PATH
