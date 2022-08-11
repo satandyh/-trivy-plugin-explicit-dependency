@@ -1,6 +1,32 @@
 # trivy-plugin-explicit-dependency
 A [Trivy](https://github.com/aquasecurity/trivy) plugin that scans the filesystem and leaves only explicit dependency packages
 
+## Requirements
+
+OS: linux (arch amd64)
+
+Dependencies: bash
+
+Tested with trivy v0.30.4
+## Working with
+Plugin analyze files where explicit dependency listed. **So if in Your project this file has different name this plugin will not work!**
+
+For this moment plugin support next languages.
+
+| **Language** | **File**         | **Filesystem** |
+| ------------ | ---------------- | :------------: |
+| Node.js      | package.json     |       ✅        |
+| Ruby         | gemspec          |       -        |
+| Python       | requirements.txt |       -        |
+|              | Pipfile          |       -        |
+|              | setup.py         |       -        |
+| PHP          |                  |       -        |
+| .NET         |                  |       -        |
+| Java         | pom.xml          |       -        |
+| Go           | go.mod           |       -        |
+|              | go.sum           |       -        |
+| Rust         |                  |       -        |
+
 ## Install
 
 ```bash
@@ -28,6 +54,7 @@ Examples:
 
 ## Usage
 Plugin's options should to be passed after `--`.
+
 Trivy's options need to be passed after `--global`.
 
 ```bash
