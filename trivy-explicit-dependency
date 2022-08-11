@@ -9,7 +9,7 @@ IGNORE_PKG=()   # all vulnerable packages that not exist in package.json - they 
 # Usage
 function usage() {
   cat <<EOS >&2
-A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
+A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.
 Important! You have to use '--' to pass flags to plugin. Without it all flags will be passed as global.
 
 Usage:

@@ -13,7 +13,7 @@ Plugin analyze files where explicit dependency listed. **So if in Your project t
 
 For this moment plugin support next languages.
 
-| **Language** | **File**         | **Filesystem** |
+| **Language** | **File** *       | **Filesystem** |
 | ------------ | ---------------- | :------------: |
 | Node.js      | package.json     |       ✅        |
 | Ruby         | gemspec          |       -        |
@@ -27,12 +27,13 @@ For this moment plugin support next languages.
 |              | go.sum           |       -        |
 | Rust         |                  |       -        |
 
+*Filename case insensitive.
 ## Install
 
 ```bash
 $ trivy plugin install github.com/satandyh/trivy-plugin-explicit-dependency
 $ trivy exp-dep -- -h
-A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
+A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.
 Important! You have to use '--' to pass flags to plugin. Without it all flags will be passed as global.
 
 Usage:
