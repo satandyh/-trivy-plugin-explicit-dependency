@@ -45,7 +45,7 @@ function filterFindNPM() {
   te=()
   # find all packages that present in prescan result and in package.json file
   while read -r line; do
-    te+=($(find $PROJECT_PATH -name package.json -exec grep -o "\"$line\":" {} \; | cut -d"\"" -f2))
+    te+=($(find $PROJECT_PATH -name package.json -exec grep -o -i -e "\"$line\":" -e "\"[\@a-z0-9\-]*\/$line\":" {} \; | grep -v -i -e "\".*\": \".* .*\"" | cut -d"\"" -f2 | cut -d"/" -f2))
   done <<<$PRESCAN_PKG
   VULN_PKG=($(echo "${te[@]}" | tr ' ' '\n' | sort | uniq | tr '\n' ' '))
   unset te
