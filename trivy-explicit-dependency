@@ -1,25 +1,32 @@
 #!/bin/bash
 
-# VARS
-PRESCAN_PKG=()
-PROJECT_PATH=()
-FILTER=()
-IGNORE_PKG=()
+# Variables
+PROJECT_PATH=() # project path
+PRESCAN_PKG=()  # all founded vulnerable packages from prescan
+VULN_PKG=()     # only vulnerable packages that exist in package.json (explicit dependencies)
+IGNORE_PKG=()   # all vulnerable packages that not exist in package.json - they should be ignored
 
 # Usage
 function usage() {
   cat <<EOS >&2
-Usage: trivy exp-dep [-h,--help] PROJECT_PATH [TRIVY OPTION]
- A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
+A Trivy plugin that scans the filesystem and skip all except packages in **/**/package.yaml files.
+Important! You have to use '--' to pass flags to plugin. Without it all flags will be passed as global.
+
+Usage:
+  trivy exp-dep -- [-h,--help] -p PROJECT_PATH [--global] [TRIVY OPTION]
 
 Options:
+  --            Flag indicating that all options after should pass to plugin.
   -h, --help    Show usage.
+  -p, --path    Directory where to scan.
+  --global      Indicate taht all flags after will be passed as trivy global/fs options.
+                Positional, should be after "-p/-h/--" options.
 
 Examples:
   # Scan fs
-  trivy exp-dep /path/to/project
+  trivy exp-dep -- -p /path/to/project
   # Scan fs and filter by severity
-  trivy exp-dep /path/to/project -- --severity CRITICAL
+  trivy exp-dep -- --path /path/to/project --global --severity CRITICAL
 EOS
   exit
 }
@@ -35,15 +42,15 @@ function findfiles() {
 }
 
 function filterFindNPM() {
-  TEMP=()
+  te=()
   # find all packages that present in prescan result and in package.json file
   while read -r line; do
-    TEMP+=($(find $PROJECT_PATH -name package.json -exec grep -o "\"$line\":" {} \; | cut -d"\"" -f2))
+    te+=($(find $PROJECT_PATH -name package.json -exec grep -o "\"$line\":" {} \; | cut -d"\"" -f2))
   done <<<$PRESCAN_PKG
-  FILTER=($(echo "${TEMP[@]}" | tr ' ' '\n' | sort | uniq | tr '\n' ' '))
-  unset TEMP
+  VULN_PKG=($(echo "${te[@]}" | tr ' ' '\n' | sort | uniq | tr '\n' ' '))
+  unset te
   # find all packages that present only in prescan result - we will ignore them in policy
-  IGNORE_PKG=($(echo ${PRESCAN_PKG[@]} ${FILTER[@]} | tr ' ' '\n' | sort | uniq -u | tr '\n' ' '))
+  IGNORE_PKG=($(echo ${PRESCAN_PKG[@]} ${VULN_PKG[@]} | tr ' ' '\n' | sort | uniq -u | tr '\n' ' '))
 }
 
 # create policy
@@ -56,9 +63,9 @@ import data.lib.trivy
 default ignore = false
 
 EOF
-  v=$(printf "\"%s\"," ${IGNORE_PKG[@]})
-  echo "ignore_pkgs := {${v::-1}}" >>$PROJECT_PATH/ignore_policy.rego
-
+  ve=$(printf "\"%s\"," ${IGNORE_PKG[@]})
+  echo "ignore_pkgs := {${ve::-1}}" >>$PROJECT_PATH/ignore_policy.rego
+  unset ve
   cat <<EOF >>$PROJECT_PATH/ignore_policy.rego
 
 ignore {
@@ -79,25 +86,27 @@ if [[ ($# -eq 0) || ($1 == "--help") || ($1 == "-h") ]]; then
   usage
 fi
 
-PROJECT_PATH=()
-for opt in "$@"; do
-  case "${opt}" in
-  '--')
+while test $# -gt 0; do
+  case "$1" in
+  -h | --help)
+    usage
+    break
+    ;;
+  -p | --path)
+    shift
+    PROJECT_PATH="$1"
+    shift
+    ;;
+  '--global')
     shift
     TRIVY_PARAM=("$@")
     break
     ;;
-  *)
-    if [ -n "$1" ]; then
-      PROJECT_PATH+=("$1")
-    fi
-    shift
-    ;;
   esac
 done
 
-firstscan ${TRIVY_PARAM[@]} $PROJECT_PATH
+firstscan "${TRIVY_PARAM[@]}" "$PROJECT_PATH"
 findfiles
 filterFindNPM
 create_policy
-scan ${TRIVY_PARAM[@]} $PROJECT_PATH
+scan "${TRIVY_PARAM[@]}" "$PROJECT_PATH"
