@@ -17,9 +17,9 @@ For this moment plugin support next languages.
 | ------------ | ---------------- | :------------: |
 | Node.js      | package.json     |       ✅        |
 | Ruby         | gemspec          |       -        |
-| Python       | requirements.txt |       -        |
-|              | Pipfile          |       -        |
-|              | setup.py         |       -        |
+| Python       | requirements.txt |       ✅        |
+|              | Pipfile          |       ✅        |
+|              | pyproject.toml   |       ✅        |
 | PHP          |                  |       -        |
 | .NET         |                  |       -        |
 | Java         | pom.xml          |       -        |

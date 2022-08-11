@@ -41,11 +41,18 @@ function findfiles() {
   PRESCAN_PKG=$(grep '"PkgName":' $PROJECT_PATH/prescan.json | cut -d"\"" -f4 | sort | uniq)
 }
 
-function filterFindNPM() {
+function filterFind() {
   te=()
   # find all packages that present in prescan result and in package.json file
   while read -r line; do
-    te+=($(find $PROJECT_PATH -name package.json -exec grep -o -i -e "\"$line\":" -e "\"[\@a-z0-9\-]*\/$line\":" {} \; | grep -v -i -e "\".*\": \".* .*\"" >/dev/null && echo $line))
+    # npm/yarn package.json
+    te+=($(find $PROJECT_PATH -iname package.json -exec grep -o -i -e "\"$line\":" -e "\"[\@a-z0-9\-]*\/$line\":" {} \; | grep -v -i -e "\".*\": \".* .*\"" >/dev/null && echo $line))
+    # python requirements.txt
+    te+=($(find $PROJECT_PATH -iname requirements.txt -exec grep -i -e "$line *\<" -e "$line *\=" -e "$line *\>" -e "$line *\^" {} \; | grep -v -i -e "^ *#" >/dev/null && echo $line))
+    # python Pipfile
+    te+=($(find $PROJECT_PATH -iname Pipfile -exec grep -i -e "$line *\= *" {} \; | grep -v -i -e "^ *#" >/dev/null && echo $line))
+    # python pyproject.toml
+    te+=($(find $PROJECT_PATH -iname pyproject.toml -exec grep -i -e "$line *\= *" {} \; | grep -v -i -e "^ *#" >/dev/null && echo $line))
   done <<<$PRESCAN_PKG
   VULN_PKG=($(echo "${te[@]}" | tr ' ' '\n' | sort | uniq | tr '\n' ' '))
   unset te
@@ -107,6 +114,6 @@ done
 
 firstscan "${TRIVY_PARAM[@]}" "$PROJECT_PATH"
 findfiles
-filterFindNPM
+filterFind
 create_policy
 scan "${TRIVY_PARAM[@]}" "$PROJECT_PATH"
