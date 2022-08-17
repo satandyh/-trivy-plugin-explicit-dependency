@@ -1,0 +1,19 @@
+#cargo-features = ["strip"]
+[package]
+name = "trivy-exp-dep"
+version = "0.1.1"
+edition = "2021"
+repository = "https://github.com/satandyh/trivy-plugin-explicit-dependency"
+readme = "README.md"
+description = """
+A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.
+"""
+
+[dependencies]
+clap = "3.2.17"
+regex = "1.6.0"
+serde_json = "1.0.83"
+walkdir = "2.3.2"
+
+[[bin]]
+name = "trivy-exp-dep"
