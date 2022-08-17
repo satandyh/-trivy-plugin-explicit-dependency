@@ -30,6 +30,10 @@ fn main() -> std::io::Result<()> {
         .get_matches();
 
     let project_path = exp_dep.value_of("path").unwrap();
+    if !path::Path::new(project_path).is_dir() {
+        eprintln!("No such directory to scan {}", project_path);
+        std::process::exit(1)
+    }
     let global: Vec<&str>;
 
     // firstscan
@@ -63,7 +67,8 @@ fn main() -> std::io::Result<()> {
     if !firstscanres.status.success() {
         String::from_utf8(firstscanres.stderr)
             .into_iter()
-            .for_each(|x| println!("{:#?}", x));
+            .for_each(|x| eprintln!("{:#?}", x));
+        std::process::exit(1);
     }
 
     // findfiles
