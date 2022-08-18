@@ -8,7 +8,7 @@ use walkdir::WalkDir;
 
 fn main() -> std::io::Result<()> {
     let exp_dep = App::new("trivy-exp-dep")
-        .version("0.1.1")
+        .version("0.1.2")
         .author("Anton Gura <satandyh@yandex.ru>")
         .about("A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.")
         .arg(Arg::with_name("path")
@@ -37,7 +37,7 @@ fn main() -> std::io::Result<()> {
     let global: Vec<&str>;
 
     // firstscan
-    let prescan = path::Path::new(env::temp_dir().as_os_str()).join("prescan.json");
+    let prescan = path::Path::new(env::temp_dir().as_path()).join("prescan.json");
     let mut firstscan = Command::new("trivy");
     if !exp_dep.value_of("global").is_none() {
         global = exp_dep.values_of("global").unwrap().collect();
@@ -47,7 +47,7 @@ fn main() -> std::io::Result<()> {
             .arg("-f")
             .arg("json")
             .arg("-o")
-            .arg(prescan.as_os_str().to_str().unwrap());
+            .arg(prescan.to_str().unwrap());
         for opt in global {
             firstscan.arg(opt);
         }
@@ -59,7 +59,7 @@ fn main() -> std::io::Result<()> {
             "-f",
             "json",
             "-o",
-            prescan.as_os_str().to_str().unwrap(),
+            prescan.to_str().unwrap(),
             project_path,
         ]);
     }
@@ -72,29 +72,46 @@ fn main() -> std::io::Result<()> {
     }
 
     // findfiles
+    if !path::Path::new(prescan.to_str().unwrap()).exists() {
+        eprintln!(
+            "No such file or it's can't be read {}",
+            prescan.to_str().unwrap()
+        );
+        std::process::exit(1)
+    }
     let prescan_json = {
-        let jsondata = std::fs::read_to_string(&prescan).unwrap();
+        let jsondata = std::fs::read_to_string(prescan.to_str().unwrap()).unwrap();
         serde_json::from_str::<Value>(&jsondata).unwrap()
     };
 
     let mut prescan_pkg = Vec::new();
-    for index1 in 0..prescan_json["Results"].as_array().unwrap().len() {
-        for index2 in 0..prescan_json["Results"][index1]["Vulnerabilities"]
-            .as_array()
-            .unwrap()
-            .len()
-        {
-            prescan_pkg.push(
-                prescan_json["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
-                    .as_str()
-                    .unwrap(),
-            );
+    if prescan_json.get("Results") != None {
+        for index1 in 0..prescan_json["Results"].as_array().unwrap().len() {
+            for index2 in 0..prescan_json["Results"][index1]["Vulnerabilities"]
+                .as_array()
+                .unwrap()
+                .len()
+            {
+                prescan_pkg.push(
+                    prescan_json["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
+                        .as_str()
+                        .unwrap(),
+                );
+            }
         }
+        prescan_pkg.dedup();
+        println!("{}", prescan_pkg.join(" "));
+    } else {
+        // the same as if prescan_pkg.len() == 0
+        std::fs::copy(
+            prescan.to_str().unwrap(),
+            format!("{}{}", project_path, "/trivy.json".to_string()),
+        )?;
+        std::fs::remove_file(prescan.to_str().unwrap())?;
+        std::process::exit(0);
     }
-    prescan_pkg.dedup();
-    println!("{}", prescan_pkg.join(" "));
 
-    // findfiles
+    // filterfind
     for entry in WalkDir::new(project_path)
         .into_iter()
         .filter_map(|e| e.ok())
