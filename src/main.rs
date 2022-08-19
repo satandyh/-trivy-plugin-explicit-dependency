@@ -127,6 +127,11 @@ fn main() -> std::io::Result<()> {
             .to_ascii_lowercase()
             .to_string_lossy()
             .ends_with("pipfile")
+            || entry
+                .file_name()
+                .to_ascii_lowercase()
+                .to_string_lossy()
+                .ends_with("pyproject.toml")
         {
             // read file
             let input = File::open(entry.path())?;
