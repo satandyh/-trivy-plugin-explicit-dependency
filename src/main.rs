@@ -109,10 +109,9 @@ fn main() -> std::io::Result<()> {
             }
         }
     } else {
-        std::fs::copy(
-            prescan.to_str().unwrap(),
-            format!("{}{}", _project_path, "/trivy.json".to_string()),
-        )?;
+        String::from_utf8(firstscanres.stdout)
+            .into_iter()
+            .for_each(|x| print!("{}", x));
         std::fs::remove_file(prescan.to_str().unwrap())?;
         std::process::exit(0);
     }
@@ -197,12 +196,16 @@ fn main() -> std::io::Result<()> {
         String::from_utf8(scanres.stderr)
             .into_iter()
             .for_each(|x| eprint!("{}", x));
+        std::fs::remove_file(prescan.to_str().unwrap())?;
+        std::fs::remove_file(policy_path.to_str().unwrap())?;
         std::process::exit(1);
     } else {
         String::from_utf8(scanres.stdout)
             .into_iter()
             .for_each(|x| print!("{}", x));
     }
+    std::fs::remove_file(prescan.to_str().unwrap())?;
+    std::fs::remove_file(policy_path.to_str().unwrap())?;
 
     Ok(())
 }
