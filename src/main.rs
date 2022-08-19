@@ -1,9 +1,10 @@
 use clap::{App, Arg};
-use regex::{self, Regex};
+use regex::Regex;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::io::BufRead;
+use std::fs::File;
+use std::io::{BufRead, Write};
 use std::path;
 use std::process::Command;
 use walkdir::WalkDir;
@@ -15,6 +16,7 @@ fn main() -> std::io::Result<()> {
     let mut _VULN_PKG: HashSet<String> = HashSet::new(); // only vulnerable packages that exist in package.json (explicit dependencies)
     let mut _IGNORE_PKG: HashSet<String> = HashSet::new(); // all vulnerable packages that not exist in package.json - they should be ignored
 
+    /* get args */
     let exp_dep = App::new("trivy-exp-dep")
         .version("0.1.2")
         .author("Anton Gura <satandyh@yandex.ru>")
@@ -107,17 +109,12 @@ fn main() -> std::io::Result<()> {
             }
         }
     } else {
-        // the same as if _PRESCAN_PKG.len() == 0
         std::fs::copy(
             prescan.to_str().unwrap(),
             format!("{}{}", _PROJECT_PATH, "/trivy.json".to_string()),
         )?;
         std::fs::remove_file(prescan.to_str().unwrap())?;
         std::process::exit(0);
-    }
-    // check
-    for i in _PRESCAN_PKG.clone() {
-        println!("--> {}", i);
     }
 
     /* FILTERFIND */
@@ -133,15 +130,14 @@ fn main() -> std::io::Result<()> {
             .ends_with("pipfile")
         {
             // read file
-            let input = std::fs::File::open(entry.path())?;
+            let input = File::open(entry.path())?;
             let buffered = std::io::BufReader::new(input);
             // stored elements for filter
             let mut exp_set: HashMap<String, Regex> = HashMap::new();
             for element in _PRESCAN_PKG.clone() {
                 exp_set.insert(
                     element.to_string(),
-                    regex::Regex::new(format!(r"(?i)(^\s*{}\s*=\s*)", element.as_str()).as_str())
-                        .unwrap(),
+                    Regex::new(format!(r"(?i)(^\s*{}\s*=\s*)", element.as_str()).as_str()).unwrap(),
                 );
             }
             // filter thru all regex
@@ -154,13 +150,25 @@ fn main() -> std::io::Result<()> {
             }
         }
     }
-    // check
-    for j in _VULN_PKG.clone() {
-        println!("==> {}", j);
-    }
-    //_IGNORE_PKG = _PRESCAN_PKG.clone().difference(&_VULN_PKG.clone()).collect()::<HashSet<String>>();
-    //for k in _IGNORE_PKG.clone() {
-    //    println!("++> {}", k);
-    //}
+    _IGNORE_PKG = _PRESCAN_PKG
+        .clone()
+        .difference(&_VULN_PKG.clone())
+        .cloned()
+        .collect();
+
+    /* CREATEPOLICY */
+    let policy_path = path::Path::new(env::temp_dir().as_path()).join("ignore_policy.rego");
+    let mut output = File::create(policy_path)?;
+    let pola = "package trivy\nimport data.lib.trivy\ndefault ignore = false";
+    let polb = format!(
+        "ignore_pkgs := {}{}{}",
+        "{",
+        _IGNORE_PKG.into_iter().collect::<Vec<String>>().join(","),
+        "}"
+    );
+    let polc = "ignore {\ninput.PkgName == ignore_pkgs[_]\n}\n";
+    let policy_cotent = [pola, polb.as_str(), polc].join("\n");
+    write!(output, "{}", policy_cotent)?;
+
     Ok(())
 }
