@@ -1,7 +1,7 @@
 #cargo-features = ["strip"]
 [package]
 name = "trivy-exp-dep"
-version = "0.1.1"
+version = "0.1.3"
 edition = "2021"
 repository = "https://github.com/satandyh/trivy-plugin-explicit-dependency"
 readme = "README.md"
