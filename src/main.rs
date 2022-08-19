@@ -18,7 +18,7 @@ fn main() -> std::io::Result<()> {
 
     /* get args */
     let exp_dep = App::new("trivy-exp-dep")
-        .version("0.1.3")
+        .version("0.1.4")
         .author("Anton Gura <satandyh@yandex.ru>")
         .about("A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.")
         .arg(Arg::with_name("path")
@@ -30,7 +30,6 @@ fn main() -> std::io::Result<()> {
             .help("Directory where to scan. Current Working dir is default."))
         .arg(Arg::with_name("global")
             .long("global")
-            //.last(true)
             .global(true)
             .takes_value(true)
             .multiple(true)
@@ -40,81 +39,17 @@ fn main() -> std::io::Result<()> {
         .get_matches();
 
     _project_path = exp_dep.value_of("path").unwrap();
+    //    _project_path = exp_dep.get_one::<&str>("path").unwrap();
+    let mut global: Vec<&str> = vec![""];
+    if !exp_dep.value_of("global").is_none() {
+        global = exp_dep.values_of("global").unwrap().collect();
+    }
     if !path::Path::new(_project_path).is_dir() {
         eprintln!("No such directory to scan {}", _project_path);
         std::process::exit(1)
     }
-    let mut global: Vec<&str>;
 
-    /* FIRSTSCAN */
-    let prescan = path::Path::new(env::temp_dir().as_path()).join("prescan.json");
-    let mut firstscan = Command::new("trivy");
-    if !exp_dep.value_of("global").is_none() {
-        global = exp_dep.values_of("global").unwrap().collect();
-        firstscan
-            .arg("fs")
-            .arg("-q")
-            .arg("-f")
-            .arg("json")
-            .arg("-o")
-            .arg(prescan.to_str().unwrap());
-        for opt in global {
-            firstscan.arg(opt);
-        }
-        firstscan.arg(_project_path);
-    } else {
-        firstscan.args([
-            "fs",
-            "-q",
-            "-f",
-            "json",
-            "-o",
-            prescan.to_str().unwrap(),
-            _project_path,
-        ]);
-    }
-    let firstscanres = firstscan.output()?;
-    if !firstscanres.status.success() {
-        String::from_utf8(firstscanres.stderr)
-            .into_iter()
-            .for_each(|x| eprint!("{}", x));
-        std::process::exit(1);
-    }
-
-    /* FINDFILES */
-    if !path::Path::new(prescan.to_str().unwrap()).exists() {
-        eprintln!(
-            "No such file or it's can't be read {}",
-            prescan.to_str().unwrap()
-        );
-        std::process::exit(1)
-    }
-    let prescan_json = {
-        let jsondata = std::fs::read_to_string(prescan.to_str().unwrap()).unwrap();
-        serde_json::from_str::<Value>(&jsondata).unwrap()
-    };
-
-    if prescan_json.get("Results") != None {
-        for index1 in 0..prescan_json["Results"].as_array().unwrap().len() {
-            for index2 in 0..prescan_json["Results"][index1]["Vulnerabilities"]
-                .as_array()
-                .unwrap()
-                .len()
-            {
-                _prescan_pkg.insert(
-                    prescan_json["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
-                        .to_string()
-                        .replace('"', ""), // fucking quotes
-                );
-            }
-        }
-    } else {
-        String::from_utf8(firstscanres.stdout)
-            .into_iter()
-            .for_each(|x| print!("{}", x));
-        std::fs::remove_file(prescan.to_str().unwrap())?;
-        std::process::exit(0);
-    }
+    (_prescan_pkg, _) = findpkg(&global, _project_path);
 
     /* FILTERFIND */
     for entry in WalkDir::new(_project_path)
@@ -184,7 +119,7 @@ fn main() -> std::io::Result<()> {
         scan.arg("fs")
             .arg("--ignore-policy")
             .arg(policy_path.clone().as_os_str().to_str().unwrap());
-        for opt in global {
+        for opt in &global {
             scan.arg(opt);
         }
         scan.arg(_project_path);
@@ -201,7 +136,6 @@ fn main() -> std::io::Result<()> {
         String::from_utf8(scanres.stderr)
             .into_iter()
             .for_each(|x| eprint!("{}", x));
-        std::fs::remove_file(prescan.to_str().unwrap())?;
         std::fs::remove_file(policy_path.to_str().unwrap())?;
         std::process::exit(1);
     } else {
@@ -209,8 +143,86 @@ fn main() -> std::io::Result<()> {
             .into_iter()
             .for_each(|x| print!("{}", x));
     }
-    std::fs::remove_file(prescan.to_str().unwrap())?;
     std::fs::remove_file(policy_path.to_str().unwrap())?;
 
     Ok(())
+}
+
+fn findpkg(global: &Vec<&str>, project_path: &str) -> (HashSet<String>, std::io::Result<()>) {
+    let mut output: HashSet<String> = HashSet::new();
+    let result: std::io::Result<()>;
+    // path for temp file
+    let temp_file = path::Path::new(env::temp_dir().as_path()).join("prescan.json");
+
+    /* Make first scan and form some results with we will analyze after */
+    let mut firstscan = Command::new("trivy");
+    if global.len() > 1 {
+        firstscan
+            .arg("fs")
+            .arg("-q")
+            .arg("-f")
+            .arg("json")
+            .arg("-o")
+            .arg(&temp_file.to_str().unwrap());
+        for opt in global {
+            firstscan.arg(opt);
+        }
+        firstscan.arg(project_path);
+    } else {
+        firstscan.args([
+            "fs",
+            "-q",
+            "-f",
+            "json",
+            "-o",
+            &temp_file.to_str().unwrap(),
+            project_path,
+        ]);
+    }
+    let stat = firstscan.output();
+    let cmd_out = firstscan.output().unwrap();
+    if !&stat.unwrap().status.success() {
+        String::from_utf8(cmd_out.stderr)
+            .into_iter()
+            .for_each(|x| eprint!("{}", x));
+        std::process::exit(1);
+    }
+
+    /* Analyze results and get only packet names */
+    if !path::Path::new(&temp_file.to_str().unwrap()).exists() {
+        eprintln!(
+            "No such file or it's can't be read {}",
+            &temp_file.to_str().unwrap()
+        );
+        std::process::exit(1)
+    }
+    let json_str = {
+        let jsondata = std::fs::read_to_string(&temp_file.to_str().unwrap()).unwrap();
+        serde_json::from_str::<Value>(&jsondata).unwrap()
+    };
+
+    result = std::fs::remove_file(&temp_file.to_str().unwrap());
+
+    if json_str.get("Results") != None {
+        for index1 in 0..json_str["Results"].as_array().unwrap().len() {
+            for index2 in 0..json_str["Results"][index1]["Vulnerabilities"]
+                .as_array()
+                .unwrap()
+                .len()
+            {
+                output.insert(
+                    json_str["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
+                        .to_string()
+                        .replace('"', ""), // fucking quotes
+                );
+            }
+        }
+    } else {
+        String::from_utf8(cmd_out.stdout)
+            .into_iter()
+            .for_each(|x| print!("{}", x));
+        std::process::exit(0);
+    };
+
+    (output, result)
 }
