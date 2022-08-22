@@ -40,16 +40,23 @@ fn main() -> std::io::Result<()> {
 
     _project_path = exp_dep.value_of("path").unwrap();
     //    _project_path = exp_dep.get_one::<&str>("path").unwrap();
+    //let mut global: Vec<&str>;
+
     let mut global: Vec<&str> = vec![""];
+    let gl: i8; // supprot var for global values - show does it present or not
     if !exp_dep.value_of("global").is_none() {
         global = exp_dep.values_of("global").unwrap().collect();
+        gl = 1;
+    } else {
+        gl = 2;
     }
     if !path::Path::new(_project_path).is_dir() {
         eprintln!("No such directory to scan {}", _project_path);
         std::process::exit(1)
     }
 
-    (_prescan_pkg, _) = findpkg(&global, _project_path);
+    /* GET RESULTS BEFORE ANALYZE */
+    (_prescan_pkg, _) = findpkg(&global, _project_path, gl);
 
     /* FILTERFIND */
     for entry in WalkDir::new(_project_path)
@@ -148,7 +155,11 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn findpkg(global: &Vec<&str>, project_path: &str) -> (HashSet<String>, std::io::Result<()>) {
+fn findpkg(
+    global: &Vec<&str>,
+    project_path: &str,
+    gl_stat: i8,
+) -> (HashSet<String>, std::io::Result<()>) {
     let mut output: HashSet<String> = HashSet::new();
     let result: std::io::Result<()>;
     // path for temp file
@@ -156,7 +167,9 @@ fn findpkg(global: &Vec<&str>, project_path: &str) -> (HashSet<String>, std::io:
 
     /* Make first scan and form some results with we will analyze after */
     let mut firstscan = Command::new("trivy");
-    if global.len() > 1 {
+    if gl_stat == 1 {
+        //if global.len() > 1 {
+
         firstscan
             .arg("fs")
             .arg("-q")
