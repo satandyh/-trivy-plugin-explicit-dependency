@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# Variables
+PROJECT_PATH=() # project path
+PRESCAN_PKG=()  # all founded vulnerable packages from prescan
+VULN_PKG=()     # only vulnerable packages that exist in package.json (explicit dependencies)
+IGNORE_PKG=()   # all vulnerable packages that not exist in package.json - they should be ignored
+
+# Usage
+function usage() {
+  cat <<EOS >&2
+A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.
+Important! You have to use '--' to pass flags to plugin. Without it all flags will be passed as global.
+
+Usage:
+  trivy exp-dep -- [-h,--help] -p PROJECT_PATH [--global] [TRIVY OPTION]
+
+Options:
+  --            Flag indicating that all options after should pass to plugin.
+  -h, --help    Show usage.
+  -p, --path    Directory where to scan.
+  --global      Indicate taht all flags after will be passed as trivy global/fs options.
+                Positional, should be after "-p/-h/--" options.
+
+Examples:
+  # Scan fs
+  trivy exp-dep -- -p /path/to/project
+  # Scan fs and filter by severity
+  trivy exp-dep -- --path /path/to/project --global --severity CRITICAL
+EOS
+  exit
+}
+
+# pre scan without any policy
+function firstscan() {
+  trivy fs -q -f json -o $PROJECT_PATH/prescan.json $@
+}
+
+# find all packages in json file after prescan
+function findfiles() {
+  PRESCAN_PKG=$(grep '"PkgName":' $PROJECT_PATH/prescan.json | cut -d"\"" -f4 | sort | uniq)
+}
+
+function filterFind() {
+  te=()
+  # find all packages that present in prescan result and in package.json file
+  while read -r line; do
+    # npm/yarn package.json
+    te+=($(find $PROJECT_PATH -iname package.json -exec grep -o -i -e "\"$line\":" -e "\"[\@a-z0-9\-]*\/$line\":" {} \; | grep -v -i -e "\".*\": \".* .*\"" >/dev/null && echo $line))
+    # python requirements.txt
+    te+=($(find $PROJECT_PATH -iname requirements.txt -exec grep -i -e "$line *\<" -e "$line *\=" -e "$line *\>" -e "$line *\^" {} \; | grep -v -i -e "^ *#" >/dev/null && echo $line))
+    # python Pipfile
+    te+=($(find $PROJECT_PATH -iname Pipfile -exec grep -i -e "$line *\= *" {} \; | grep -v -i -e "^ *#" >/dev/null && echo $line))
+    # python pyproject.toml
+    te+=($(find $PROJECT_PATH -iname pyproject.toml -exec grep -i -e "$line *\= *" {} \; | grep -v -i -e "^ *#" >/dev/null && echo $line))
+  done <<<$PRESCAN_PKG
+  VULN_PKG=($(echo "${te[@]}" | tr ' ' '\n' | sort | uniq | tr '\n' ' '))
+  unset te
+  # find all packages that present only in prescan result - we will ignore them in policy
+  IGNORE_PKG=($(echo ${PRESCAN_PKG[@]} ${VULN_PKG[@]} | tr ' ' '\n' | sort | uniq -u | tr '\n' ' '))
+}
+
+# create policy
+function create_policy() {
+  cat <<EOF >$PROJECT_PATH/ignore_policy.rego
+package trivy
+
+import data.lib.trivy
+
+default ignore = false
+
+EOF
+  ve=$(printf "\"%s\"," ${IGNORE_PKG[@]})
+  echo "ignore_pkgs := {${ve::-1}}" >>$PROJECT_PATH/ignore_policy.rego
+  unset ve
+  cat <<EOF >>$PROJECT_PATH/ignore_policy.rego
+
+ignore {
+  input.PkgName == ignore_pkgs[_]
+}
+EOF
+}
+
+# main scan
+function scan {
+  trivy fs --ignore-policy $PROJECT_PATH/ignore_policy.rego $@
+  rm $PROJECT_PATH/ignore_policy.rego
+  rm $PROJECT_PATH/prescan.json
+}
+
+if [[ ($# -eq 0) || ($1 == "--help") || ($1 == "-h") ]]; then
+  # No commands or the -h/--help flag passed and we'll show the usage instructions
+  usage
+fi
+
+while test $# -gt 0; do
+  case "$1" in
+  -h | --help)
+    usage
+    break
+    ;;
+  -p | --path)
+    shift
+    PROJECT_PATH="$1"
+    shift
+    ;;
+  '--global')
+    shift
+    TRIVY_PARAM=("$@")
+    break
+    ;;
+  esac
+done
+
+firstscan "${TRIVY_PARAM[@]}" "$PROJECT_PATH"
+findfiles
+filterFind
+create_policy
+scan "${TRIVY_PARAM[@]}" "$PROJECT_PATH"
