@@ -18,7 +18,7 @@ fn main() -> std::io::Result<()> {
 
     /* get args */
     let exp_dep = App::new("trivy-exp-dep")
-        .version("0.1.4")
+        .version("0.2.0")
         .author("Anton Gura <satandyh@yandex.ru>")
         .about("A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.")
         .arg(Arg::with_name("path")
@@ -97,6 +97,8 @@ fn main() -> std::io::Result<()> {
                 }
             }
         }
+
+        /* requirements.txt */
 
         /* package.json */
         if entry
