@@ -63,6 +63,7 @@ fn main() -> std::io::Result<()> {
         .into_iter()
         .filter_map(|e| e.ok())
     {
+        /* Pipfile pyproject.toml */
         //case insensitive by lowercase
         if entry
             .file_name()
@@ -83,7 +84,43 @@ fn main() -> std::io::Result<()> {
             for element in _prescan_pkg.clone() {
                 exp_set.insert(
                     element.to_string(),
-                    Regex::new(format!(r"(?i)(^\s*{}\s*=\s*)", element.as_str()).as_str()).unwrap(),
+                    Regex::new(format!(r#"(?i)^\s*({})\s*=\s*"#, element.as_str()).as_str())
+                        .unwrap(),
+                );
+            }
+            // filter thru all regex
+            for line in buffered.lines().filter_map(|x| x.ok()) {
+                for (key, value) in exp_set.iter() {
+                    if value.is_match(line.as_str()) {
+                        _vuln_pkg.insert(key.to_string());
+                    }
+                }
+            }
+        }
+
+        /* package.json */
+        if entry
+            .file_name()
+            .to_ascii_lowercase()
+            .to_string_lossy()
+            .ends_with("package.json")
+        {
+            // read file
+            let input = File::open(entry.path())?;
+            let buffered = std::io::BufReader::new(input);
+            // stored elements for filter
+            let mut exp_set: HashMap<String, Regex> = HashMap::new();
+            for element in _prescan_pkg.clone() {
+                exp_set.insert(
+                    element.to_string(),
+                    Regex::new(
+                        format!(
+                            r#"(?i)^\s*"(?:\W*[^/]*\W*)/?({})"\s*:\s*"\S+""#,
+                            element.as_str()
+                        )
+                        .as_str(),
+                    )
+                    .unwrap(),
                 );
             }
             // filter thru all regex
