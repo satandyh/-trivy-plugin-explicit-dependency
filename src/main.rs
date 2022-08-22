@@ -194,6 +194,11 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
+/*
+This function start trivy and store results into temp json file.
+After it read and analyze this file and gets all vulnerable packages into HashSet<String>.
+Temp file removed at end of function.
+*/
 fn findpkg(
     global: &Vec<&str>,
     project_path: &str,
@@ -207,8 +212,6 @@ fn findpkg(
     /* Make first scan and form some results with we will analyze after */
     let mut firstscan = Command::new("trivy");
     if gl_stat == 1 {
-        //if global.len() > 1 {
-
         firstscan
             .arg("fs")
             .arg("-q")
@@ -265,7 +268,7 @@ fn findpkg(
                 output.insert(
                     json_str["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
                         .to_string()
-                        .replace('"', ""), // fucking quotes
+                        .replace('"', ""), // damn quotes
                 );
             }
         }
