@@ -5,7 +5,10 @@ A [Trivy](https://github.com/aquasecurity/trivy) plugin that scans the filesyste
 
 OS: linux (arch amd64)
 
-Dependencies: bash
+Dependencies:
+
+- bash (if you want to use shell version)
+- no any (if you want to use rust version)
 
 Tested with trivy v0.30.4
 ## Working with
@@ -34,7 +37,7 @@ For this moment plugin support next languages.
 $ trivy plugin install github.com/satandyh/trivy-plugin-explicit-dependency
 $ trivy exp-dep -- -h
 A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.
-Important! You have to use '--' to pass flags to plugin. Without it all flags will be passed as global.
+Important! You have to use '--' to pass flags to plugin. Without it all flags will be passed as global for shell version.
 
 Usage:
   trivy exp-dep -- [-h,--help] -p PROJECT_PATH [--global] [TRIVY OPTION]
