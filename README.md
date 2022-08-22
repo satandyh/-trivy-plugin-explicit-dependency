@@ -1,5 +1,12 @@
 # trivy-plugin-explicit-dependency
-A [Trivy](https://github.com/aquasecurity/trivy) plugin that scans the filesystem and leaves only explicit dependency packages
+A [Trivy](https://github.com/aquasecurity/trivy) plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.
+
+Inside You will find 2 versions:
+
+- rust (by default)
+- bash
+
+If You want to use bash version - You need just copy `trivy-explicit-dependency_shell` to ~/.trivy/
 
 ## Requirements
 

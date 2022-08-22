@@ -18,7 +18,7 @@ fn main() -> std::io::Result<()> {
 
     /* get args */
     let exp_dep = App::new("trivy-exp-dep")
-        .version("0.3.1")
+        .version("0.4.2")
         .author("Anton Gura <satandyh@yandex.ru>")
         .about("A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.\nImportant! You have to use '--' to pass flags to plugin. Without it all flags will be passed as global.")
         .override_usage("trivy exp-dep -- [OPTIONS]\n    # Scan fs\n      trivy exp-dep -- -p /path/to/project\n    # Scan fs and filter by severity\n      trivy exp-dep -- --path /path/to/project --global --severity CRITICAL")
@@ -291,19 +291,26 @@ fn findpkg(
 
     result = std::fs::remove_file(&temp_file.to_str().unwrap());
 
-    if json_str.get("Results") != None {
-        for index1 in 0..json_str["Results"].as_array().unwrap().len() {
-            for index2 in 0..json_str["Results"][index1]["Vulnerabilities"]
-                .as_array()
-                .unwrap()
-                .len()
-            {
-                output.insert(
-                    json_str["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
-                        .to_string()
-                        .replace('"', ""), // damn quotes
-                );
+    if json_str.clone().get("Results") != None {
+        if json_str.clone().get("Vulnerabilities") != None {
+            for index1 in 0..json_str["Results"].as_array().unwrap().len() {
+                for index2 in 0..json_str["Results"][index1]["Vulnerabilities"]
+                    .as_array()
+                    .unwrap()
+                    .len()
+                {
+                    output.insert(
+                        json_str["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
+                            .to_string()
+                            .replace('"', ""), // damn quotes
+                    );
+                }
             }
+        } else {
+            String::from_utf8(cmd_out.stdout)
+                .into_iter()
+                .for_each(|x| print!("{}", x));
+            std::process::exit(0);
         }
     } else {
         String::from_utf8(cmd_out.stdout)
