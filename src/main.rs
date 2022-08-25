@@ -18,7 +18,7 @@ fn main() -> std::io::Result<()> {
 
     /* get args */
     let exp_dep = App::new("trivy-exp-dep")
-        .version("0.4.4")
+        .version("0.4.5")
         .author("Anton Gura <satandyh@yandex.ru>")
         .about("A Trivy plugin that scans the filesystem and skips all packages except for explicitly specified dependencies.\nImportant! You have to use '--' to pass flags to plugin. Without it all flags will be passed as global.")
         .override_usage("trivy exp-dep -- [OPTIONS]\n    # Scan fs\n      trivy exp-dep -- -p /path/to/project\n    # Scan fs and filter by severity\n      trivy exp-dep -- --path /path/to/project --global --severity CRITICAL")
@@ -298,11 +298,17 @@ fn findpkg(
                 .unwrap()
                 .len()
             {
-                output.insert(
-                    json_str["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
-                        .to_string()
-                        .replace('"', ""), // damn quotes
-                );
+                if json_str["Results"][index1]["Vulnerabilities"][index2]
+                    .clone()
+                    .get("PkgName")
+                    != None
+                {
+                    output.insert(
+                        json_str["Results"][index1]["Vulnerabilities"][index2]["PkgName"]
+                            .to_string()
+                            .replace('"', ""), // damn quotes
+                    );
+                }
             }
         }
     } else {
